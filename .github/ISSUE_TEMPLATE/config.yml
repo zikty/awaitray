@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/zikty/awaitray/discussions
+    about: How do I…? Is this a bug? Would this make sense? Ask here first.
+  - name: Report a security problem
+    url: https://github.com/zikty/awaitray/security/advisories/new
+    about: Privately, never in a public issue (see SECURITY.md).

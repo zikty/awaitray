@@ -1,0 +1,16 @@
+[Unit]
+Description=awaitray — PR review tray + git fetch
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=@HERE@
+ExecStart=/usr/bin/python3 -m awaitray
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

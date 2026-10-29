@@ -1,0 +1,31 @@
+name: Feature request
+description: Something awaitray could do.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        awaitray stays small on purpose. These are out of scope, so please
+        don't ask for them:
+        - approving or merging from the menu (it would encourage
+          rubber-stamping, and turn a read-only tool into a write tool);
+        - AI summaries of PRs;
+        - Bitbucket (it has no official CLI like `gh`, so awaitray would
+          have to store tokens);
+        - a repository dashboard (stars, releases, heatmaps);
+        - global keyboard shortcuts.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem or the workflow, before any solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How you do it today, or other tools that do it

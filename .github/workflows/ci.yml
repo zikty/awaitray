@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A new push to the same branch or PR replaces the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff, mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install ruff mypy
+      - run: ruff check .
+      - run: ruff format --check .
+      - name: Type check (mypy --strict on the core)
+        run: mypy awaitray
+      - name: Architecture graph is current
+        run: python scripts/arch_graph.py --check
+
+  tests:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install macOS backend deps
+        if: runner.os == 'macOS'
+        run: pip install -r requirements-macos.txt
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+  linux-gtk:
+    name: Linux backend (GTK + DBusMenu, Xvfb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install GTK, AppIndicator and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 \
+            xvfb xauth dbus libglib2.0-bin
+      - name: Unit tests with real GTK widgets
+        run: xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -v
+      - name: End-to-end menu as exported over DBusMenu
+        run: PYTHON=/usr/bin/python3 xvfb-run -a dbus-run-session -- tests/e2e/linux_dbusmenu.sh
+      - name: Upgrade from devtray with update.sh
+        run: PYTHON=/usr/bin/python3 xvfb-run -a tests/e2e/linux_migration.sh
+
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Syntax check
+        run: for f in *.sh lib/*.sh packaging/*.sh packaging/deb/*.sh tests/e2e/*.sh; do bash -n "$f"; done
+      - name: ShellCheck
+        run: shellcheck --severity=warning -x *.sh lib/*.sh packaging/*.sh packaging/deb/*.sh tests/e2e/*.sh

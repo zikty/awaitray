@@ -1,0 +1,21 @@
+# Release notes (gh release create --generate-notes) grouped by the PRs'
+# labels; a PR with none of these lands under "Other changes".
+changelog:
+  exclude:
+    labels: [skip-changelog]
+    authors: [dependabot]
+  categories:
+    - title: New
+      labels: [enhancement]
+    - title: Fixes
+      labels: [bug]
+    - title: Security
+      labels: [security]
+    - title: Linux
+      labels: [linux]
+    - title: macOS
+      labels: [macos]
+    - title: Documentation
+      labels: [docs]
+    - title: Other changes
+      labels: ["*"]

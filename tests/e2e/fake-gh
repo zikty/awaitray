@@ -1,0 +1,22 @@
+#!/bin/sh
+# Fake gh: logged in, and a canned GraphQL search result.
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "api graphql")
+    cat <<JSON
+{"data":{"viewer":{"login":"me"},"search":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[
+ {"number":412,"title":"Fix login_redirect handling","url":"https://github.com/acme/web_app/pull/412","isDraft":false,
+  "createdAt":"2026-09-23T12:00:00Z","updatedAt":"2026-09-24T12:00:00Z","author":{"login":"alice_b"},
+  "repository":{"nameWithOwner":"acme/web_app"},"headRefOid":"abc","reviewDecision":null,"mergeable":"MERGEABLE",
+  "comments":{"totalCount":1},"commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"SUCCESS"}}}]},
+  "reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"User","login":"me"}}]}},
+ {"number":77,"title":"Team only change","url":"https://github.com/acme/api/pull/77","isDraft":false,
+  "createdAt":"2026-09-25T09:00:00Z","updatedAt":"2026-09-25T09:00:00Z","author":{"login":"carol"},
+  "repository":{"nameWithOwner":"acme/api"},"headRefOid":"def","reviewDecision":null,"mergeable":"MERGEABLE",
+  "comments":{"totalCount":0},"commits":{"nodes":[{"commit":{"statusCheckRollup":{"state":"PENDING"}}}]},
+  "reviewRequests":{"nodes":[{"requestedReviewer":{"__typename":"Team"}}]}}
+]}}}
+JSON
+    exit 0 ;;
+esac
+exit 1

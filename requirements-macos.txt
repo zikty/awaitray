@@ -1,0 +1,6 @@
+# macOS backend dependency: PyObjC Cocoa bindings (AppKit + Foundation).
+# The whole macOS UI (NSStatusItem menu bar + NSWindow preferences) is
+# built directly on PyObjC — no rumps. Linux runs with zero PyPI deps.
+# `gh` and `git` are still required on PATH (install via Homebrew):
+#     brew install gh git
+pyobjc-framework-Cocoa>=9.0

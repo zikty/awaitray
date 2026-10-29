@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # The app has no Python runtime dependencies to bump (PyObjC is unpinned on
+  # macOS); the workflows' actions are what goes stale.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

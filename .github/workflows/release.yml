@@ -1,0 +1,144 @@
+name: Release
+
+# Push a tag vX.Y.Z (matching pyproject.toml) to publish a GitHub release
+# with the .deb attached, then update the Homebrew tap and the AUR package
+# to that tag. Each package step needs its secret and is skipped, with a
+# notice, without it, so forks and a first release still work:
+#
+#   HOMEBREW_TAP_TOKEN  fine-grained token, contents: write on TAP_REPO only
+#   AUR_SSH_KEY         private key of the AUR account that owns the package
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  TAP_REPO: zikty/homebrew-awaitray
+  AUR_PACKAGE: awaitray
+
+jobs:
+  release:
+    name: GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      url: ${{ steps.tarball.outputs.url }}
+      sha256: ${{ steps.tarball.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tag matches the package version
+        id: version
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+          test "v$version" = "$GITHUB_REF_NAME" || {
+            echo "::error::tag $GITHUB_REF_NAME != version $version in pyproject.toml"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build the .deb
+        run: packaging/deb/build.sh
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --generate-notes --title "awaitray $VERSION"
+          gh release upload "$GITHUB_REF_NAME" dist/*.deb --clobber
+      - name: Source tarball checksum
+        id: tarball
+        run: |
+          url="https://github.com/$GITHUB_REPOSITORY/archive/refs/tags/$GITHUB_REF_NAME.tar.gz"
+          sha="$(curl -fsSL --retry 3 "$url" | sha256sum | cut -d' ' -f1)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "Source tarball: \`$url\` sha256 \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
+
+  homebrew:
+    name: Homebrew tap
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - name: Skip without HOMEBREW_TAP_TOKEN
+        if: env.TOKEN == ''
+        run: echo "::notice::HOMEBREW_TAP_TOKEN not set; the tap was not updated"
+      - uses: actions/checkout@v7
+        if: env.TOKEN != ''
+        with:
+          path: src
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        if: env.TOKEN != ''
+        with:
+          repository: ${{ env.TAP_REPO }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+      - name: Update Formula/awaitray.rb and push
+        if: env.TOKEN != ''
+        env:
+          URL: ${{ needs.release.outputs.url }}
+          SHA: ${{ needs.release.outputs.sha256 }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          mkdir -p tap/Formula
+          # Only the formula's own url/sha256 (two-space indent), never a resource's.
+          sed -e "s|^  url \".*\"|  url \"$URL\"|" \
+              -e "s|^  sha256 \".*\"|  sha256 \"$SHA\"|" \
+              src/packaging/homebrew/awaitray.rb > tap/Formula/awaitray.rb
+          grep -E '^  (url|sha256) ' tap/Formula/awaitray.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/awaitray.rb
+          git diff --cached --quiet && { echo "already up to date"; exit 0; }
+          git commit -m "awaitray $VERSION"
+          git push
+
+  aur:
+    name: AUR package
+    needs: release
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      KEY: ${{ secrets.AUR_SSH_KEY }}
+    steps:
+      - name: Skip without AUR_SSH_KEY
+        if: env.KEY == ''
+        run: echo "::notice::AUR_SSH_KEY not set; the AUR package was not updated"
+      - name: Tools
+        if: env.KEY != ''
+        run: pacman -Syu --noconfirm --needed base-devel git openssh
+      - uses: actions/checkout@v7
+        if: env.KEY != ''
+        with:
+          path: src
+          persist-credentials: false
+      - name: Update PKGBUILD and .SRCINFO and push
+        if: env.KEY != ''
+        env:
+          SHA: ${{ needs.release.outputs.sha256 }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          install -dm700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/aur && chmod 600 ~/.ssh/aur
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          # Container jobs set HOME, but ssh looks in the passwd home: name both files.
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          git clone "ssh://aur@aur.archlinux.org/$AUR_PACKAGE.git" aur
+          sed -e "s/^pkgver=.*/pkgver=$VERSION/" -e "s/^pkgrel=.*/pkgrel=1/" \
+              -e "s/^sha256sums=.*/sha256sums=('$SHA')/" \
+              src/packaging/aur/PKGBUILD > aur/PKGBUILD
+          useradd -m builder && chown -R builder aur
+          su builder -c "cd aur && makepkg --printsrcinfo > .SRCINFO"
+          cd aur
+          git config --global --add safe.directory "$PWD"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add PKGBUILD .SRCINFO
+          git diff --cached --quiet && { echo "already up to date"; exit 0; }
+          git commit -m "awaitray $VERSION"
+          git push origin HEAD:master

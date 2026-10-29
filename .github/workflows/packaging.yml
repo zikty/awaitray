@@ -1,0 +1,98 @@
+name: Packaging
+
+# Builds and installs each package from this checkout, so a packaging change
+# is proven before a release uses it.
+on:
+  push:
+    branches: [main]
+    paths: ["packaging/**", "pyproject.toml", "icons/**", ".github/workflows/packaging.yml"]
+  pull_request:
+    paths: ["packaging/**", "pyproject.toml", "icons/**", ".github/workflows/packaging.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deb:
+    name: .deb (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        run: packaging/deb/build.sh
+      - name: Inspect
+        run: dpkg-deb --info dist/*.deb && dpkg-deb --contents dist/*.deb
+      - name: Install (pulls the runtime dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ./dist/*.deb xvfb xauth dbus
+      - name: CLI works from the installed package
+        run: awaitray config path
+      - name: Tray app starts from the installed package
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp tests/e2e/fake-gh "$RUNNER_TEMP/bin/gh"
+          chmod +x "$RUNNER_TEMP/bin/gh"
+          cd "$RUNNER_TEMP"
+          set +e
+          PATH="$RUNNER_TEMP/bin:$PATH" timeout 10 xvfb-run -a dbus-run-session -- awaitray > app.log 2>&1
+          status=$?
+          set -e
+          cat app.log
+          # 124 = still running when the timeout hit: it started fine.
+          test "$status" -eq 124
+          ! grep -q Traceback app.log
+
+  aur:
+    name: PKGBUILD (Arch)
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build and runtime dependencies
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git python python-gobject gtk3 \
+            libayatana-appindicator libnotify github-cli
+      - uses: actions/checkout@v7
+      - name: makepkg from a tarball of this checkout
+        run: |
+          ver="$(sed -n 's/^pkgver=//p' packaging/aur/PKGBUILD)"
+          useradd -m builder
+          mkdir /build && cp packaging/aur/PKGBUILD /build/
+          git config --global --add safe.directory "$PWD"
+          git archive --prefix="awaitray-$ver/" -o "/build/awaitray-$ver.tar.gz" HEAD
+          chown -R builder /build
+          cd /build && su builder -c "makepkg --noconfirm"
+          pacman -U --noconfirm /build/awaitray-*.pkg.tar.zst
+      - name: CLI works from the installed package
+        run: awaitray config path
+
+  homebrew:
+    name: Homebrew formula (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install from a local tap, pointing the formula at this checkout
+        run: |
+          ver="$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -1)"
+          # Named like the release tarball, so Homebrew infers the version.
+          tarball="$RUNNER_TEMP/awaitray-$ver.tar.gz"
+          git archive --prefix="awaitray-$ver/" -o "$tarball" HEAD
+          sha="$(shasum -a 256 "$tarball" | cut -d' ' -f1)"
+          brew tap-new --no-git local/awaitray
+          formula="$(brew --repo local/awaitray)/Formula/awaitray.rb"
+          sed -e "s|^  url \"https://github.com/zikty/awaitray/.*\"|  url \"file://$tarball\"|" \
+              -e "s|^  sha256 \"0\{64\}\"|  sha256 \"$sha\"|" \
+              packaging/homebrew/awaitray.rb > "$formula"
+          grep -E '^  (url|sha256) ' "$formula"
+          brew install --build-from-source local/awaitray/awaitray
+      - name: Formula test block
+        run: brew test local/awaitray/awaitray
+      - name: The app's modules import (menu bar, prefs)
+        run: |
+          "$(brew --prefix)/opt/awaitray/libexec/bin/python" -c \
+            "import awaitray.backends.macos.app, awaitray.backends.macos.ui.prefs_window"

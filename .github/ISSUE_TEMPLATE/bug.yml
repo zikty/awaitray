@@ -1,0 +1,63 @@
+name: Bug report
+description: Something doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The log (Preferences → Advanced → Logs) usually
+        says what went wrong; please include it.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux
+        - macOS
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: OS and desktop
+      description: e.g. Ubuntu 24.04 with GNOME 46, Fedora 41 with KDE 6, macOS 26.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How awaitray was installed
+      options:
+        - Homebrew
+        - .deb package
+        - AUR
+        - install script from a clone
+        - run from source
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "The release you installed (or `git rev-parse --short HEAD` in a clone), and `gh --version`."
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: From Preferences → Advanced → Logs. Check it for anything private first.
+      render: text

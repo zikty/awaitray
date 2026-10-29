@@ -1,0 +1,27 @@
+# Maintainer: zikty <zikty@users.noreply.github.com>
+#
+# A template: the release workflow publishes it to the AUR with the tag's
+# pkgver and the source tarball's real sha256sums (SKIP is never published).
+pkgname=awaitray
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Tray icon for GitHub pull requests awaiting your review, plus periodic git fetch'
+arch=('any')
+url='https://github.com/zikty/awaitray'
+license=('MIT')
+depends=(
+  'python>=3.10'
+  'python-gobject'
+  'gtk3'
+  'libayatana-appindicator'
+  'libnotify'
+  'git'
+  'github-cli'
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd "$pkgname-$pkgver"
+  ./packaging/install-tree.sh "$pkgdir"
+}

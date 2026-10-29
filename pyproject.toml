@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "awaitray"
+version = "0.1.0"
+description = "Tray / menu-bar helper: PRs awaiting your review and periodic git fetch"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+classifiers = [
+    "Environment :: X11 Applications :: GTK",
+    "Environment :: MacOS X :: Cocoa",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+
+[project.optional-dependencies]
+macos = ["pyobjc-framework-Cocoa"]
+
+[project.scripts]
+awaitray = "awaitray.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["awaitray*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# Menu glyphs (⚠ ✗ ‖ ⎇ …) are intentional.
+ignore = ["RUF001"]
+
+[tool.ruff.lint.per-file-ignores]
+# gi.require_version() must run before importing from gi.repository.
+"awaitray/backends/linux/**" = ["E402"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+# The toolkit backends (gi, AppKit) have no type information.
+[[tool.mypy.overrides]]
+module = ["gi", "gi.*", "AppKit", "Foundation", "objc"]
+ignore_missing_imports = true
+
+# The backends are thin toolkit glue over untyped gi / PyObjC APIs: strict
+# typing there would be all casts. The core they render is fully checked.
+[[tool.mypy.overrides]]
+module = ["awaitray.backends.*"]
+ignore_errors = true
