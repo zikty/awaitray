@@ -12,7 +12,20 @@ bugs and concrete proposals. Security problems are reported privately (see
 [SECURITY.md](SECURITY.md)). Everyone taking part follows the
 [Code of Conduct](CODE_OF_CONDUCT.md).
 
+New here? Issues tagged
+[`good first issue`](https://github.com/zikty/awaitray/labels/good%20first%20issue)
+are small and well scoped;
+[`help wanted`](https://github.com/zikty/awaitray/labels/help%20wanted) is
+everything else contributions are welcome on. For anything larger than a bug
+fix, open a Discussion or an issue first, so the approach is agreed and nobody
+duplicates work.
+
 ## Running locally
+
+On Linux the toolkit is a system package, not pip: install `python3-gi`,
+`gir1.2-gtk-3.0`, `gir1.2-ayatanaappindicator3-0.1` and `libnotify-bin`
+(Debian/Ubuntu names). On macOS `run-macos.sh` creates a `.venv` with PyObjC
+on first run, so there's nothing to install by hand.
 
 ```bash
 # Linux
@@ -76,3 +89,8 @@ CI; the rest are checked in review.
   platforms. If you can only test one, say so in the PR.
 - Run the tests, lint and shellcheck before pushing.
 - Reference the issue you're closing.
+- Label the PR so it lands in the right release-notes section (`enhancement`,
+  `bug`, `security`, `linux`, `macos`, `docs`; the mapping is in
+  [`.github/release.yml`](.github/release.yml)). `skip-changelog` leaves it out.
+- By opening a PR you agree your contribution is licensed under the project's
+  [MIT License](LICENSE).
